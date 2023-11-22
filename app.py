@@ -1,6 +1,11 @@
 from flask import Flask, render_template, request
+from database import DBhandler
+import hashlib
 import sys
+
 application = Flask(__name__)
+
+DB=DBhandler()
 
 @application.route("/")
 def hello():
@@ -9,6 +14,18 @@ def hello():
 @application.route("/login")
 def view_login():
     return render_template("login.html")
+
+@application.route("/login_confirm", methods=['POST'])
+def login_user():
+    id_=request.form['id']
+    pw=request.form['pw']
+    pw_hash = hashlib.sha256(pw.encode('utf-8')).hexdigest()
+    if DB.find_user(id_,pw_hash):
+        session['id']=id_
+        return redirect(url_for('view_list'))
+    else:
+        flash("Wrong ID or PW!")
+        return render_template("login.html")
 
 @application.route("/list")
 def view_list():
@@ -45,7 +62,9 @@ def reg_item_submit_post():
     image_file=request.files["file"]
     image_file.save("static/images/{}".format(image_file.filename))
     data=request.form
-    return render_template("submit_item_result.html", data=data, img_path="static/images/{}".format(image_file.filename))
+    DB.insert_item(data['name'], data, image_file.filename)
+    return render_template("submit_item_result.html", data=data, img_path=
+    "static/images/{}".format(image_file.filename))
 
 
 if __name__ == "__main__":
