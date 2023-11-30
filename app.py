@@ -58,6 +58,7 @@ def view_list():
     start_idx=per_page*page
     end_idx=per_page*(page+1)
     data = DB.get_items() #read the table
+    data = dict(sorted(data.items(), key=lambda x: x[0], reverse=False))
     item_counts = len(data)
     data = dict(list(data.items())[start_idx:end_idx])
     tot_count = len(data)
@@ -79,14 +80,37 @@ def view_list():
 
 @application.route("/review")
 def view_review():
-    return render_template("review.html")
+    page = request.args.get("page", 0, type=int)
+    per_page=6 # item count to display per page
+    per_row=3# item count to display per row
+    row_count=int(per_page/per_row)
+    start_idx=per_page*page
+    end_idx=per_page*(page+1)
+    data = DB.get_reviews() #read the table
+    item_counts = len(data)
+    data = dict(list(data.items())[start_idx:end_idx])
+    tot_count = len(data)
+    for i in range(row_count):#last row
+        if (i == row_count-1) and (tot_count%per_row != 0):
+            locals()['data_{}'.format(i)] = dict(list(data.items())[i*per_row:])
+        else:
+            locals()['data_{}'.format(i)] = dict(list(data.items())[i*per_row:(i+1)*per_row])
+    return render_template(
+        "review.html",
+        datas=data.items(),
+        row1=locals()['data_0'].items(),
+        row2=locals()['data_1'].items(),
+        limit=per_page,
+        page=page,
+        page_count=int((item_counts/per_page)+1),
+        total=item_counts)
 
 @application.route("/reg_items")
 def reg_item():
     return render_template("reg_items.html")
 
 @application.route("/reg_reviews")
-def reg_review():
+def reg_review_template():
     return render_template("reg_reviews.html")
 
 @application.route("/submit_item")
@@ -123,7 +147,30 @@ def view_item_detail(name):
     print("####data:",data)
     return render_template("detail.html", name=name, data=data)
 
+@application.route("/reg_review_init/<name>/")
+def reg_review_init(name):
+    return render_template("reg_reviews.html", name=name)
 
+@application.route("/reg_review", methods=['POST'])
+def reg_review_submit():
+   data=request.form
+   DB.reg_review(data)
+   return redirect(url_for('view_review'))
+
+@application.route('/show_heart/<name>/', methods=['GET'])
+def show_heart(name):
+    my_heart = DB.get_heart_byname(session['id'],name)
+    return jsonify({'my_heart': my_heart})
+
+@application.route('/like/<name>/', methods=['POST'])
+def like(name):
+    my_heart = DB.update_heart(session['id'],'Y',name)
+    return jsonify({'msg': '좋아요 완료!'})
+
+@application.route('/unlike/<name>/', methods=['POST'])
+def unlike(name):
+    my_heart = DB.update_heart(session['id'],'N',name)
+    return jsonify({'msg': '안좋아요 완료!'})
 
 if __name__ == "__main__":
     application.run(host='0.0.0.0', port=5000)
